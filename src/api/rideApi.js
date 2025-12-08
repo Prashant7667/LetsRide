@@ -1,4 +1,4 @@
-import httpClient from '../utils/httpClient';
+import httpClient from "../services/httpClient";
 export const RequstRide=(rideData)=>{
     return httpClient.post('/rides/request',rideData);
 }

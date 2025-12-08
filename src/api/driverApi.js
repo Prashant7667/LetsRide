@@ -1,4 +1,4 @@
-import httpClient from '../utils/httpClient';
+import httpClient from "../services/httpClient";
 export const createDriver=(driverData)=>{
     return httpClient.post('/drivers',driverData);
 }
