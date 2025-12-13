@@ -6,7 +6,7 @@ import { AuthContext } from '../context/AuthContext';
 import { ActivityIndicator, View } from 'react-native';
 
 export default function RootNavigation() {
-  const { user, loading } = useContext(AuthContext);
+  const { userId, loading } = useContext(AuthContext);
 
   if (loading) {
     return (
@@ -18,7 +18,7 @@ export default function RootNavigation() {
 
   return (
     <NavigationContainer>
-      {user ? <AppStack /> : <AuthStack />}
+      {userId ? <AppStack /> : <AuthStack />}
     </NavigationContainer>
   );
 }

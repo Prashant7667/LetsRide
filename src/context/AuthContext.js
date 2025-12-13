@@ -1,76 +1,54 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState } from 'react';
 import * as authApi from '../api/authApi';
-import { setToken, getToken, removeToken } from '../services/storage';
+import { setToken, removeToken } from '../services/storage';
+import {jwtDecode} from 'jwt-decode';
 
 export const AuthContext = createContext();
 
 export default function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
+  const [userId, setUserId] = useState(null);
   const [role, setRole] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
-  const bootstrap = async () => {
+  const login = async ({ email, password }) => {
+    setLoading(true);
     try {
-      const token = await getToken();
-      if (!token) {
-        setLoading(false);
-        return;
-      }
-      const profile = await authApi.getProfile();
-      setUser(profile.data);
-      setRole(profile.data?.role || null);
-    } catch (e) {
-      await removeToken();
-      setUser(null);
-      setRole(null);
+      const res = await authApi.login({ email, password });
+      const bearerToken=res.data;
+      const token =bearerToken.split(' ')[1];
+      const decoded = jwtDecode(token);
+      console.log('Decoded JWT:', decoded);
+
+      await setToken(token);
+      setUserId(decoded.sub);
+      setRole(decoded.role); // DRIVER or PASSENGER
     } finally {
+      console.log({userId,role})
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    bootstrap();
-  }, []);
-
-  const login = async ({ email, password, as }) => {
-    const fn = authApi.login;
-    const res = await fn({ email, password });
-    const token = res.data?.token;
-    if (!token) throw new Error('Invalid login response');
-    await setToken(token);
-    const profile = await authApi.getProfile();
-    setUser(profile.data);
-    setRole(as);
-    return profile.data;
-  };
-
   const register = async ({ payload, as }) => {
-    const fn = as === 'driver' ? authApi.registerDriver : authApi.registerPassenger;
-    const res = await fn(payload);
-    const token = res.data?.token;
-    if (token) await setToken(token);
-    if (token) {
-      const profile = await authApi.getProfile();
-      setUser(profile.data);
-      setRole(as);
-      return profile.data;
-    }
-    return res.data;
+    const fn = as === 'driver'
+      ? authApi.registerDriver
+      : authApi.registerPassenger;
+
+    await fn(payload);
+    await login({ email: payload.email, password: payload.password });
+    console.log('Registered and logged in as', as);
   };
 
   const logout = async () => {
     await removeToken();
-    setUser(null);
+    setUserId(null);
     setRole(null);
   };
 
   return (
     <AuthContext.Provider value={{
-      user,
+      userId,
       role,
       loading,
-      setUser,
-      setRole,
       login,
       register,
       logout
