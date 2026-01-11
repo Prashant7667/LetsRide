@@ -1,74 +1,157 @@
-import React, { useState, useContext } from 'react';
-import { View, Text, FlatList, Alert } from 'react-native';
+import React, { useState, useContext, useRef, useEffect } from 'react';
+import { View, Text, ScrollView, Alert, Animated, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Input from '../../components/Input';
 import Button from '../../components/Button';
-import DriverCard from '../../components/DriverCard';
 import { RideContext } from '../../context/RideContext';
-import * as rideApi from '../../api/rideApi';
+import { isRequired } from '../../utils/validators';
 
 export default function QuickRideScreen({ navigation }) {
-  const { createRide, rides, loading, fetchRides } = useContext(RideContext);
+  const { createRide } = useContext(RideContext);
   const [pickup, setPickup] = useState('');
   const [drop, setDrop] = useState('');
-  const [seats, setSeats] = useState('1');
+  const [fare, setFare] = useState('150');
   const [searching, setSearching] = useState(false);
-  const [nearbyDrivers, setNearbyDrivers] = useState([]);
+  const [errors, setErrors] = useState({});
 
-  const onRequestQuickRide = async () => {
-    if (!pickup || !drop) {
-      Alert.alert('Missing', 'Please add pickup and drop locations');
-      return;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 500,
+      useNativeDriver: true
+    }).start();
+  }, []);
+
+  const validate = () => {
+    const newErrors = {};
+    if (!isRequired(pickup)) {
+      newErrors.pickup = 'Pickup location is required';
     }
-    try {
-      setSearching(true);
-      const payload = { pickup, drop, seats: Number(seats) };
-      const ride = await createRide(payload);
-      navigation.navigate('RideDetails', { rideId: ride.id });
-    } catch (e) {
-      Alert.alert('Error', e?.response?.data?.message || e.message || 'Failed to create ride');
-    } finally {
-      setSearching(false);
+    if (!isRequired(drop)) {
+      newErrors.drop = 'Drop location is required';
     }
+    if (!isRequired(fare) || isNaN(Number(fare)) || Number(fare) <= 0) {
+      newErrors.fare = 'Please enter a valid fare amount';
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
-  const findDrivers = async () => {
+  const onRequestQuickRide = async () => {
+    if (!validate()) {
+      return;
+    }
+
     try {
       setSearching(true);
-      const res = await rideApi.getNearbyDrivers({ lat: 0, lng: 0 });
-      setNearbyDrivers(res.data || []);
+      const ride = await createRide({
+        pickup,
+        drop,
+        fare: Number(fare),
+        pickupLocation: pickup,
+        dropLocation: drop,
+      });
+      Alert.alert('Success', 'Ride requested! Looking for drivers...');
+      navigation.navigate('RideDetails', { rideId: ride.id });
     } catch (e) {
-      Alert.alert('Error', 'Failed to fetch drivers');
+      Alert.alert('Error', e?.response?.data?.message || 'Failed to create ride. Please try again.');
     } finally {
       setSearching(false);
     }
   };
 
   return (
-    <View style={{ flex: 1, padding: 16 }}>
-      <Text style={{ fontSize: 20, marginBottom: 12 }}>Quick Ride</Text>
-      <Input placeholder="Pickup location" value={pickup} onChangeText={setPickup} />
-      <Input placeholder="Drop location" value={drop} onChangeText={setDrop} />
-      <Input placeholder="Seats" value={seats} onChangeText={setSeats} keyboardType="numeric" />
-      <View style={{ height: 12 }} />
-      <Button title={searching ? 'Searching...' : 'Request Ride'} onPress={onRequestQuickRide} loading={searching} />
-      <View style={{ height: 10 }} />
-      <Button title="Find nearby drivers" variant="ghost" onPress={findDrivers} />
-      <View style={{ height: 16 }} />
-      <Text style={{ fontSize: 16, marginBottom: 8 }}>Nearby drivers</Text>
-      <FlatList
-        data={nearbyDrivers}
-        keyExtractor={(i) => i.id?.toString() || Math.random().toString()}
-        renderItem={({ item }) => <DriverCard driver={item} onPress={() => Alert.alert('Driver selected', item.name || 'Driver')} />}
-        ListEmptyComponent={<Text style={{ color: '#666' }}>No drivers found</Text>}
-      />
-      <View style={{ height: 16 }} />
-      <Text style={{ fontSize: 16, marginBottom: 8 }}>Recent rides</Text>
-      <FlatList
-        data={rides}
-        keyExtractor={(r) => r.id?.toString() || Math.random().toString()}
-        renderItem={({ item }) => <DriverCard driver={{ name: item.driverName || 'Your ride', vehicle: item.vehicle }} onPress={() => navigation.navigate('RideDetails', { rideId: item.id })} />}
-        ListEmptyComponent={<Text style={{ color: '#666' }}>No rides yet</Text>}
-      />
-    </View>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+      >
+        <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <Text style={styles.title}>Book a Ride 🚕</Text>
+            <Text style={styles.subtitle}>Enter your ride details</Text>
+
+            <View style={styles.form}>
+              <Input
+                label="Pickup Location"
+                placeholder="Enter pickup address"
+                value={pickup}
+                onChangeText={(text) => {
+                  setPickup(text);
+                  if (errors.pickup) setErrors({ ...errors, pickup: null });
+                }}
+                error={errors.pickup}
+                autoCapitalize="words"
+              />
+
+              <Input
+                label="Drop Location"
+                placeholder="Enter destination address"
+                value={drop}
+                onChangeText={(text) => {
+                  setDrop(text);
+                  if (errors.drop) setErrors({ ...errors, drop: null });
+                }}
+                error={errors.drop}
+                autoCapitalize="words"
+              />
+
+              <Input
+                label="Fare (₹)"
+                placeholder="Enter fare amount"
+                keyboardType="numeric"
+                value={fare}
+                onChangeText={(text) => {
+                  setFare(text);
+                  if (errors.fare) setErrors({ ...errors, fare: null });
+                }}
+                error={errors.fare}
+              />
+            </View>
+
+            <Button
+              title={searching ? 'Requesting...' : 'Request Ride'}
+              loading={searching}
+              onPress={onRequestQuickRide}
+              style={styles.submitButton}
+              size="large"
+            />
+          </ScrollView>
+        </Animated.View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#0d1117',
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+    padding: 20,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#c9d1d9',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#8b949e',
+    marginBottom: 32,
+  },
+  form: {
+    marginBottom: 24,
+  },
+  submitButton: {
+    marginTop: 8,
+  },
+});

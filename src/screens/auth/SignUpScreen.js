@@ -1,8 +1,10 @@
 import React, { useState, useContext, useEffect } from 'react';
-import { View, Text, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, KeyboardAvoidingView, Platform, Alert, ScrollView, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Input from '../../components/Input';
 import Button from '../../components/Button';
 import { AuthContext } from '../../context/AuthContext';
+import { isEmail, isRequired, isPhone } from '../../utils/validators';
 
 export default function SignUpScreen({ route, navigation }) {
   const { as } = route.params || {};
@@ -12,38 +14,188 @@ export default function SignUpScreen({ route, navigation }) {
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
   const { register } = useContext(AuthContext);
 
   useEffect(() => {
     navigation.setOptions({ title: `Sign up as ${roleParam}` });
   }, [navigation, roleParam]);
 
+  const validate = () => {
+    const newErrors = {};
+    if (!isRequired(name)) {
+      newErrors.name = 'Name is required';
+    }
+    if (!isRequired(email)) {
+      newErrors.email = 'Email is required';
+    } else if (!isEmail(email)) {
+      newErrors.email = 'Please enter a valid email';
+    }
+    if (!isRequired(password)) {
+      newErrors.password = 'Password is required';
+    } else if (password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
+    }
+    if (phone && !isPhone(phone)) {
+      newErrors.phone = 'Please enter a valid phone number';
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const onSubmit = async () => {
+    if (!validate()) return;
+
     setLoading(true);
     try {
-      const payload = { name, email, password, phone };
+      const payload = { name, email, password, phone: phone || undefined };
       await register({ payload, as: roleParam });
     } catch (e) {
-      Alert.alert('Sign up failed', e?.response?.data?.message || e.message || 'Something went wrong');
+      Alert.alert(
+        'Sign Up Failed',
+        e?.response?.data?.message || e.message || 'Something went wrong. Please try again.'
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, padding: 20, justifyContent: 'center' }}>
-      <Text style={{ fontSize: 22, marginBottom: 20 }}>Create account ({roleParam})</Text>
-      <Input placeholder="Full name" value={name} onChangeText={setName} />
-      <View style={{ height: 12 }} />
-      <Input placeholder="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
-      <View style={{ height: 12 }} />
-      <Input placeholder="Phone (optional)" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
-      <View style={{ height: 12 }} />
-      <Input placeholder="Password" value={password} onChangeText={setPassword} secureTextEntry />
-      <View style={{ height: 16 }} />
-      <Button title={loading ? 'Creating...' : 'Create account'} onPress={onSubmit} disabled={loading} />
-      <View style={{ height: 10 }} />
-      <Button title="Already have an account? Login" variant="ghost" onPress={() => navigation.navigate('Login', { as: roleParam })} />
-    </KeyboardAvoidingView>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.header}>
+            <Text style={styles.emoji}>{roleParam === 'driver' ? '🚗' : '👤'}</Text>
+            <Text style={styles.title}>Create Account</Text>
+            <Text style={styles.subtitle}>Sign up as {roleParam}</Text>
+          </View>
+
+          <View style={styles.form}>
+            <Input
+              label="Full Name"
+              placeholder="Enter your full name"
+              value={name}
+              onChangeText={(text) => {
+                setName(text);
+                if (errors.name) setErrors({ ...errors, name: null });
+              }}
+              error={errors.name}
+              autoCapitalize="words"
+            />
+
+            <Input
+              label="Email"
+              placeholder="Enter your email"
+              value={email}
+              onChangeText={(text) => {
+                setEmail(text);
+                if (errors.email) setErrors({ ...errors, email: null });
+              }}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              error={errors.email}
+            />
+
+            <Input
+              label="Phone (Optional)"
+              placeholder="Enter your phone number"
+              value={phone}
+              onChangeText={(text) => {
+                setPhone(text);
+                if (errors.phone) setErrors({ ...errors, phone: null });
+              }}
+              keyboardType="phone-pad"
+              error={errors.phone}
+            />
+
+            <Input
+              label="Password"
+              placeholder="Enter your password"
+              value={password}
+              onChangeText={(text) => {
+                setPassword(text);
+                if (errors.password) setErrors({ ...errors, password: null });
+              }}
+              secureTextEntry
+              error={errors.password}
+            />
+          </View>
+
+          <Button
+            title={loading ? 'Creating Account...' : 'Create Account'}
+            onPress={onSubmit}
+            disabled={loading}
+            style={styles.submitButton}
+            size="large"
+          />
+
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Already have an account? </Text>
+            <Button
+              title="Login"
+              variant="ghost"
+              onPress={() => navigation.navigate('Login', { as: roleParam })}
+              size="small"
+            />
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#0d1117',
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    padding: 24,
+    justifyContent: 'center',
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  emoji: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#c9d1d9',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#8b949e',
+    textTransform: 'capitalize',
+  },
+  form: {
+    marginBottom: 24,
+  },
+  submitButton: {
+    marginBottom: 24,
+  },
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  footerText: {
+    color: '#8b949e',
+    fontSize: 14,
+  },
+});

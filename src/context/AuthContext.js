@@ -1,54 +1,106 @@
-import React, { createContext, useState } from 'react';
+import React, { createContext, useState, useEffect } from 'react';
 import * as authApi from '../api/authApi';
-import { setToken, removeToken } from '../services/storage';
-import {jwtDecode} from 'jwt-decode';
+import { setToken, removeToken, getToken } from '../services/storage';
+import { jwtDecode } from 'jwt-decode';
 
 export const AuthContext = createContext();
 
 export default function AuthProvider({ children }) {
   const [userId, setUserId] = useState(null);
   const [role, setRole] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [initializing, setInitializing] = useState(true);
+
+  // Check for existing token on mount
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    try {
+      const token = await getToken();
+      if (token) {
+        try {
+          const decoded = jwtDecode(token);
+          setUserId(decoded.sub);
+          setRole(decoded.role);
+        } catch (e) {
+          // Invalid token, remove it
+          await removeToken();
+        }
+      }
+    } catch (e) {
+      console.error('Auth check failed:', e);
+    } finally {
+      setInitializing(false);
+      setLoading(false);
+    }
+  };
 
   const login = async ({ email, password }) => {
     setLoading(true);
     try {
       const res = await authApi.login({ email, password });
-      const bearerToken=res.data;
-      const token =bearerToken.split(' ')[1];
-      const decoded = jwtDecode(token);
-      console.log('Decoded JWT:', decoded);
+      let token;
+      
+      // Handle both "Bearer token" and just "token" formats
+      if (typeof res.data === 'string') {
+        token = res.data.startsWith('Bearer ') ? res.data.split(' ')[1] : res.data;
+      } else {
+        token = res.data.token || res.data.accessToken;
+      }
+      
+      if (!token) {
+        throw new Error('No token received');
+      }
 
+      const decoded = jwtDecode(token);
       await setToken(token);
-      setUserId(decoded.sub);
-      setRole(decoded.role); // DRIVER or PASSENGER
+      setUserId(decoded.sub || decoded.userId || decoded.id);
+      setRole(decoded.role);
+      return { success: true };
+    } catch (e) {
+      console.error('Login error:', e);
+      throw e;
     } finally {
-      console.log({userId,role})
       setLoading(false);
     }
   };
 
   const register = async ({ payload, as }) => {
-    const fn = as === 'driver'
-      ? authApi.registerDriver
-      : authApi.registerPassenger;
+    setLoading(true);
+    try {
+      const fn = as === 'driver'
+        ? authApi.registerDriver
+        : authApi.registerPassenger;
 
-    await fn(payload);
-    await login({ email: payload.email, password: payload.password });
-    console.log('Registered and logged in as', as);
+      await fn(payload);
+      await login({ email: payload.email, password: payload.password });
+      return { success: true };
+    } catch (e) {
+      console.error('Registration error:', e);
+      throw e;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const logout = async () => {
-    await removeToken();
-    setUserId(null);
-    setRole(null);
+    setLoading(true);
+    try {
+      await removeToken();
+      setUserId(null);
+      setRole(null);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <AuthContext.Provider value={{
       userId,
       role,
-      loading,
+      loading: loading || initializing,
       login,
       register,
       logout
