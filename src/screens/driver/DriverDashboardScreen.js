@@ -33,7 +33,7 @@ export default function DriverDashboardScreen({ navigation }) {
 
   const handleStartRide = async () => {
     try {
-      await rideApi.StartRide(currentRide.id, userId);
+      await rideApi.StartRide(currentRide.id);
       await refreshRide(currentRide.id);
       Alert.alert('Success', 'Ride started!');
     } catch (e) {
@@ -43,7 +43,7 @@ export default function DriverDashboardScreen({ navigation }) {
 
   const handleCompleteRide = async () => {
     try {
-      await rideApi.CompleteRide(currentRide.id, userId);
+      await rideApi.CompleteRide(currentRide.id);
       Alert.alert('Success', 'Ride completed!');
     } catch (e) {
       Alert.alert('Error', e?.response?.data?.message || 'Failed to complete ride');

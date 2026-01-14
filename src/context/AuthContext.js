@@ -75,6 +75,7 @@ export default function AuthProvider({ children }) {
         : authApi.registerPassenger;
 
       await fn(payload);
+      console.log({payload});
       await login({ email: payload.email, password: payload.password });
       return { success: true };
     } catch (e) {

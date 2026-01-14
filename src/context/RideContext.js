@@ -15,7 +15,9 @@ export default function RideProvider({ children }) {
   const fetchRideHistory = async () => {
     setLoading(true);
     try {
-      const res = await rideApi.getRideHistory();
+      const res = role === 'DRIVER' 
+        ? await rideApi.getDriverRideHistory()
+        : await rideApi.getPassengerRideHistory();
       setRides(res.data || []);
     } catch (e) {
       console.error('Failed to fetch ride history:', e);
@@ -57,7 +59,7 @@ export default function RideProvider({ children }) {
   const acceptRide = async (rideId) => {
     if (!userId) throw new Error('User not authenticated');
     try {
-      const res = await rideApi.AcceptRide(rideId, userId);
+      const res = await rideApi.AcceptRide(rideId);
       const updatedRide = res.data;
       setCurrentRide(updatedRide);
       setRides(prev => prev.map(r => r.id === rideId ? updatedRide : r));
@@ -72,7 +74,7 @@ export default function RideProvider({ children }) {
   const rejectRide = async (rideId) => {
     if (!userId) throw new Error('User not authenticated');
     try {
-      await rideApi.RejectRide(rideId, userId);
+      await rideApi.RejectRide(rideId);
       setAvailableRides(prev => prev.filter(r => r.id !== rideId));
     } catch (e) {
       console.error('Failed to reject ride:', e);
@@ -83,7 +85,7 @@ export default function RideProvider({ children }) {
   const startRide = async (rideId) => {
     if (!userId) throw new Error('User not authenticated');
     try {
-      const res = await rideApi.StartRide(rideId, userId);
+      const res = await rideApi.StartRide(rideId);
       const updatedRide = res.data;
       setCurrentRide(updatedRide);
       setRides(prev => prev.map(r => r.id === rideId ? updatedRide : r));
@@ -97,7 +99,7 @@ export default function RideProvider({ children }) {
   const completeRide = async (rideId) => {
     if (!userId) throw new Error('User not authenticated');
     try {
-      const res = await rideApi.CompleteRide(rideId, userId);
+      const res = await rideApi.CompleteRide(rideId);
       const updatedRide = res.data;
       setCurrentRide(null);
       setRides(prev => prev.map(r => r.id === rideId ? updatedRide : r));
@@ -108,11 +110,14 @@ export default function RideProvider({ children }) {
     }
   };
 
-  const cancelRide = async (rideId, driverId = null) => {
-    const cancelUserId = driverId || userId;
-    if (!cancelUserId) throw new Error('User not authenticated');
+  const cancelRide = async (rideId) => {
+    if (!userId) throw new Error('User not authenticated');
     try {
-      await rideApi.CancelRide(rideId, cancelUserId);
+      if (role === 'PASSENGER') {
+        await rideApi.PassengerCancelRide(rideId);
+      } else {
+        await rideApi.CancelRide(rideId);
+      }
       setRides(prev => prev.filter(r => r.id !== rideId));
       if (currentRide?.id === rideId) {
         setCurrentRide(null);

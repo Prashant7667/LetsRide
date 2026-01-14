@@ -11,9 +11,9 @@ export const getDriverById=(driverId)=>{
 export const updateDriver=(driverId,driverData)=>{
     return httpClient.put(`/drivers/${driverId}`,driverData);
 }
-export const deleteDriver=(driverId)=>{
-    return httpClient.delete(`/drivers/${driverId}`);
+export const deleteDriver=()=>{
+    return httpClient.delete(`/drivers/me`);
 }
-export const updateDriverAvailability=(driverId,availabilityData)=>{
-    return httpClient.patch(`/drivers/${driverId}/availability`,availabilityData);
+export const updateDriverAvailability=(availabilityData)=>{
+    return httpClient.patch(`/drivers/me/availability`,availabilityData);
 }

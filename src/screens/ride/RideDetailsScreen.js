@@ -87,7 +87,7 @@ export default function RideDetailsScreen({ route, navigation }) {
           style: 'destructive',
           onPress: async () => {
             try {
-              await cancelRide(rideId, ride?.driver?.id);
+              await cancelRide(rideId);
               Alert.alert('Success', 'Ride cancelled');
               navigation.goBack();
             } catch (e) {

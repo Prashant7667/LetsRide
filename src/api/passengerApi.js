@@ -5,9 +5,12 @@ export const getAllPassengers=()=>{
 export const getPassengerById=(passengerId)=>{
     return httpClient.get(`/passengers/${passengerId}`);
 }
-export const updatePassenger=(passengerId,passengerData)=>{
-    return httpClient.put(`/passengers/${passengerId}`,passengerData);
+export const updatePassenger=(passengerData)=>{
+    return httpClient.put(`/passengers/me/update`,passengerData);
 }
-export const deletePassenger=(passengerId)=>{
-    return httpClient.delete(`/passengers/${passengerId}`);
+export const deletePassenger=()=>{
+    return httpClient.delete(`/passengers/delete`);
+}
+export const getPassengerProfile=()=>{
+    return httpClient.get('/passengers/me/details');
 }
